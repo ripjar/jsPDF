@@ -5,8 +5,8 @@
 
   /** @license
    * jsPDF - PDF Document creation from JavaScript
-   * Version 1.5.3 Built on 2019-02-27T13:47:54.586Z
-   *                      CommitID 811cf73b47
+   * Version 1.5.3 Built on 2019-02-27T13:57:10.556Z
+   *                      CommitID baa45f62d5
    *
    * Copyright (c) 2010-2016 James Hall <james@parall.ax>, https://github.com/MrRio/jsPDF
    *               2010 Aaron Spike, https://github.com/acspike
@@ -12725,7 +12725,7 @@
     jsPDFAPI.html = function (src, options) {
 
       options = options || {};
-      Promise = options.Promise || window.NativePromise || Promise;
+      Promise = options.promise || window.NativePromise || Promise;
 
       options.callback = options.callback || function () {};
 
