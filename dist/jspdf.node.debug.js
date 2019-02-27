@@ -2,8 +2,8 @@
 
 /** @license
  * jsPDF - PDF Document creation from JavaScript
- * Version 1.5.3 Built on 2018-12-27T14:11:50.068Z
- *                      CommitID d93d28db14
+ * Version 1.5.3 Built on 2019-02-27T13:15:51.217Z
+ *                      CommitID 30be9f301b
  *
  * Copyright (c) 2010-2016 James Hall <james@parall.ax>, https://github.com/MrRio/jsPDF
  *               2010 Aaron Spike, https://github.com/acspike
@@ -152,6 +152,7 @@ var jsPDF = function (global) {
     var options = {};
     var filters = [];
     var userUnit = 1.0;
+    var precision;
 
     if (_typeof(orientation) === 'object') {
       options = orientation;
@@ -161,6 +162,7 @@ var jsPDF = function (global) {
       compressPdf = options.compress || options.compressPdf || compressPdf;
       filters = options.filters || (compressPdf === true ? ['FlateEncode'] : filters);
       userUnit = typeof options.userUnit === "number" ? Math.abs(options.userUnit) : 1.0;
+      precision = options.precision;
     }
 
     unit = unit || 'mm';
@@ -235,18 +237,24 @@ var jsPDF = function (global) {
       return pageFormats[value];
     };
 
-    if (typeof format === "string") {
-      format = getPageFormat(format);
-    }
+    format = format || 'a4';
 
-    format = format || getPageFormat('a4');
+    var roundToPrecision = API.roundToPrecision = API.__private__.roundToPrecision = function (number, parmPrecision) {
+      var tmpPrecision = precision || parmPrecision;
+
+      if (isNaN(number) || isNaN(tmpPrecision)) {
+        throw new Error('Invalid argument passed to jsPDF.roundToPrecision');
+      }
+
+      return number.toFixed(tmpPrecision);
+    };
 
     var f2 = API.f2 = API.__private__.f2 = function (number) {
       if (isNaN(number)) {
         throw new Error('Invalid argument passed to jsPDF.f2');
       }
 
-      return number.toFixed(2); // Ie, %.2f
+      return roundToPrecision(number, 2);
     };
 
     var f3 = API.__private__.f3 = function (number) {
@@ -254,7 +262,7 @@ var jsPDF = function (global) {
         throw new Error('Invalid argument passed to jsPDF.f3');
       }
 
-      return number.toFixed(3); // Ie, %.3f
+      return roundToPrecision(number, 3);
     };
 
     var fileId = '00000000000000000000000000000000';
@@ -1298,30 +1306,28 @@ var jsPDF = function (global) {
       return to8bitStream(text, flags).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
     };
 
-    var beginPage = API.__private__.beginPage = function (width, height) {
-      var tmp; // Dimensions are stored as user units and converted to points on output
+    var beginPage = API.__private__.beginPage = function (parmFormat, parmOrientation) {
+      var tmp, width, height;
 
-      var orientation = typeof height === 'string' && height.toLowerCase();
-
-      if (typeof width === 'string') {
-        if (tmp = getPageFormat(width.toLowerCase())) {
+      if (typeof parmFormat === 'string') {
+        if (tmp = getPageFormat(parmFormat.toLowerCase())) {
           width = tmp[0];
           height = tmp[1];
         }
       }
 
-      if (Array.isArray(width)) {
-        height = width[1];
-        width = width[0];
+      if (Array.isArray(parmFormat)) {
+        width = parmFormat[0] * k;
+        height = parmFormat[1] * k;
       }
 
-      if (isNaN(width) || isNaN(height)) {
+      if (isNaN(width)) {
         width = format[0];
         height = format[1];
       }
 
-      if (orientation) {
-        switch (orientation.substr(0, 1)) {
+      if (parmOrientation) {
+        switch (parmOrientation.substr(0, 1)) {
           case 'l':
             if (height > width) orientation = 's';
             break;
@@ -2079,15 +2085,6 @@ var jsPDF = function (global) {
 
       if (textIsOfTypeString === false) {
         throw new Error('Type of text must be string or Array. "' + text + '" is not recognized.');
-      } //Escaping 
-
-
-      var activeFontEncoding = fonts[activeFontKey].encoding;
-
-      if (activeFontEncoding === "WinAnsiEncoding" || activeFontEncoding === "StandardEncoding") {
-        text = processTextByFunction(text, function (text, posX, posY) {
-          return [ESC(text), posX, posY];
-        });
       } //If there are any newlines in text, we assume
       //the user wanted to print multiple lines, so break the
       //text up into an array. If the text is already an array,
@@ -2364,7 +2361,16 @@ var jsPDF = function (global) {
           activeFontSize: activeFontSize
         }
       };
-      events.publish('postProcessText', payload);
+      events.publish('postProcessText', payload); //Escaping 
+
+      var activeFontEncoding = fonts[activeFontKey].encoding;
+
+      if (activeFontEncoding === "WinAnsiEncoding" || activeFontEncoding === "StandardEncoding") {
+        text = processTextByFunction(text, function (text, posX, posY) {
+          return [ESC(text), posX, posY];
+        });
+      }
+
       text = payload.text;
       isHex = payload.mutex.isHex;
       var da = transformTextToSpecialArray(text);
@@ -6886,17 +6892,6 @@ window.tmp = jsPDF;
     return hash;
   };
   /**
-  * @name isString
-  * @function
-  * @param {any} object
-  * @returns {boolean} 
-  */
-
-
-  jsPDFAPI.isString = function (object) {
-    return typeof object === 'string';
-  };
-  /**
   * Validates if given String is a valid Base64-String
   *
   * @name validateStringAsBase64
@@ -7249,8 +7244,8 @@ window.tmp = jsPDF;
       if (notDefined(alias)) alias = generateAliasFromImageData(imageData);
 
       if (!(info = checkImagesForAlias(alias, images))) {
-        if (this.isString(imageData)) {
-          tmpImageData = this.convertStringToImageData(imageData);
+        if (typeof imageData === 'string') {
+          tmpImageData = this.convertStringToImageData(imageData, false);
 
           if (tmpImageData !== '') {
             imageData = tmpImageData;
@@ -7297,12 +7292,13 @@ window.tmp = jsPDF;
   */
 
 
-  jsPDFAPI.convertStringToImageData = function (stringData) {
+  jsPDFAPI.convertStringToImageData = function (stringData, throwError) {
+    throwError = typeof throwError === "boolean" ? throwError : true;
     var base64Info;
     var imageData = '';
     var rawData;
 
-    if (this.isString(stringData)) {
+    if (typeof stringData === 'string') {
       var base64Info = this.extractImageFromDataUrl(stringData);
       rawData = base64Info !== null ? base64Info.data : stringData;
 
@@ -7310,9 +7306,17 @@ window.tmp = jsPDF;
         imageData = atob(rawData);
       } catch (e) {
         if (!jsPDFAPI.validateStringAsBase64(rawData)) {
-          throw new Error('Supplied Data is not a valid base64-String jsPDF.convertStringToImageData ');
+          if (throwError) {
+            throw new Error('Supplied Data is not a valid base64-String jsPDF.convertStringToImageData ');
+          } else {
+            console.log('Supplied Data is not a valid base64-String jsPDF.convertStringToImageData ');
+          }
         } else {
-          throw new Error('atob-Error in jsPDF.convertStringToImageData ' + e.message);
+          if (throwError) {
+            throw new Error('atob-Error in jsPDF.convertStringToImageData ' + e.message);
+          } else {
+            console.log('atob-Error in jsPDF.convertStringToImageData ' + e.message);
+          }
         }
       }
     }
@@ -7411,11 +7415,11 @@ window.tmp = jsPDF;
         bpc = 8,
         dims;
 
-    if (!this.isString(data) && !this.isArrayBuffer(data) && !this.isArrayBufferView(data)) {
+    if (!(typeof data === 'string') && !this.isArrayBuffer(data) && !this.isArrayBufferView(data)) {
       return null;
     }
 
-    if (this.isString(data)) {
+    if (typeof data === 'string') {
       dims = getJpegSize(data);
     }
 
@@ -7475,18 +7479,14 @@ window.tmp = jsPDF;
       imageData = createDataURIFromElement(imageData);
     }
 
-    if (this.isString(imageData)) {
-      tmpImageData = this.convertStringToImageData(imageData);
+    if (typeof imageData === "string") {
+      tmpImageData = this.convertStringToImageData(imageData, false);
 
-      if (tmpImageData !== '') {
-        imageData = tmpImageData;
-      } else {
-        tmpImageData = jsPDFAPI.loadFile(imageData);
-
-        if (tmpImageData !== undefined) {
-          imageData = tmpImageData;
-        }
+      if (tmpImageData === '') {
+        tmpImageData = jsPDFAPI.loadFile(imageData) || '';
       }
+
+      imageData = tmpImageData;
     }
 
     format = this.getImageFileTypeByImageData(imageData);
@@ -8244,8 +8244,7 @@ window.tmp = jsPDF;
 */
 (function (jsPDFAPI) {
   /**
-  * Makes the PDF automatically print. This works in Chrome, Firefox, Acrobat
-  * Reader.
+  * Makes the PDF automatically open the print-Dialog when opened in a PDF-viewer.
   *
   * @name autoPrint
   * @function
@@ -12412,6 +12411,7 @@ window.tmp = jsPDF;
   jsPDFAPI.html = function (src, options) {
 
     options = options || {};
+    Promise = options.Promise || window.NativePromise || Promise;
 
     options.callback = options.callback || function () {};
 
