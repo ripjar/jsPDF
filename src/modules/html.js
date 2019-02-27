@@ -759,7 +759,7 @@
 		'use strict';
 		
 		options = options || {};
-		Promise = options.Promise || window.NativePromise || Promise;
+		Promise = options.promise || window.NativePromise || Promise;
 		options.callback = options.callback || function () {};
 		options.html2canvas = options.html2canvas || {};
 		options.html2canvas.canvas = options.html2canvas.canvas || this.canvas;
