@@ -12725,6 +12725,7 @@
     jsPDFAPI.html = function (src, options) {
 
       options = options || {};
+      Promise = options.Promise || window.NativePromise || Promise;
 
       options.callback = options.callback || function () {};
 
